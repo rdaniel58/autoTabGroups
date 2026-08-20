@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Auto Tab Groups</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Auto Tab Groups</h1>
+    <label class="toggle">
+      <input type="checkbox" id="enabled">
+      <span>On</span>
+    </label>
+  </header>
+
+  <div class="actions">
+    <button id="sweep" class="primary">Group all tabs</button>
+    <button id="resample">Re-sample icons</button>
+  </div>
+
+  <section class="settings">
+    <label>
+      <span>Group by</span>
+      <select id="granularity">
+        <option value="domain">Domain &mdash; docs.google.com &rarr; Google</option>
+        <option value="subdomain">Subdomain &mdash; docs.google.com &rarr; Docs &middot; Google</option>
+      </select>
+    </label>
+    <label>
+      <span>Minimum tabs per group</span>
+      <select id="minTabs">
+        <option value="1">1 &mdash; group every site</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </select>
+    </label>
+    <label class="checkbox">
+      <input type="checkbox" id="respectManualGroups">
+      <span>Leave tabs in groups I made by hand</span>
+    </label>
+  </section>
+
+  <section>
+    <h2>Learned sites <span id="siteCount" class="count"></span></h2>
+    <ul id="sites" class="list"></ul>
+    <p id="sitesEmpty" class="empty">Nothing learned yet. Open some tabs and hit
+      <em>Group all tabs</em>.</p>
+  </section>
+
+  <section id="unresolvedSection" hidden>
+    <h2>Icon unreadable <span id="unresolvedCount" class="count"></span></h2>
+    <p class="note">These sites stay ungrouped on purpose &mdash; no colour could be
+      read from their icon, and this extension never substitutes a default.</p>
+    <ul id="unresolved" class="list"></ul>
+  </section>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,94 @@
+<!doctype html>
+<html><body><pre id="out">running</pre>
+<script type="module">
+const log = [];
+let fails = 0;
+function eq(label, got, want) {
+  const ok = JSON.stringify(got) === JSON.stringify(want);
+  if (!ok) fails++;
+  log.push(`${ok ? "ok  " : "FAIL"} ${label}  got=${JSON.stringify(got)}${ok ? "" : ` want=${JSON.stringify(want)}`}`);
+}
+
+// ---- syntax check every module (chrome.* absence is expected, SyntaxError is not)
+for (const mod of ["../lib/site.js", "../lib/palette.js", "../lib/icon.js",
+                   "../lib/store.js", "../background.js", "../popup/popup.js"]) {
+  try {
+    await import(mod);
+    log.push(`ok   parse ${mod}`);
+  } catch (e) {
+    const syntax = e instanceof SyntaxError;
+    if (syntax) fails++;
+    log.push(`${syntax ? "FAIL" : "ok  "} parse ${mod} -> ${e.name}: ${e.message}`);
+  }
+}
+
+const { siteFor, refineTitle } = await import("../lib/site.js");
+const { nearestGroupColor, rgbToHex, toLch } = await import("../lib/palette.js");
+
+// ---- URL -> group identity
+const cases = [
+  ["https://www.youtube.com/watch?v=abc", "youtube", "Youtube"],
+  ["https://youtube.com/", "youtube", "Youtube"],
+  ["https://music.youtube.com/x", "youtube", "Youtube"],
+  ["https://stackoverflow.com/q/1", "stackoverflow", "Stackoverflow"],
+  ["https://news.ycombinator.com/", "ycombinator", "Ycombinator"],
+  ["https://www.bbc.co.uk/news", "bbc", "Bbc"],
+  ["https://shop.example.com.au/", "example", "Example"],
+  ["https://www.gov.uk/", "gov", "Gov"],
+  ["https://www.bbc.co.uk/", "bbc", "Bbc"],
+  ["https://gov.uk/", "gov", "Gov"],
+  ["https://sub.domain.co.jp/", "domain", "Domain"],
+  ["https://my-cool-site.dev/", "my-cool-site", "My Cool Site"],
+  ["https://a.b.c.example.io/", "example", "Example"],
+  ["http://localhost:3000/app", "localhost", "Localhost"],
+  ["http://192.168.1.10:8080/", "192.168.1.10", "192.168.1.10"],
+  ["https://user.github.io/repo", "github", "Github"],
+  ["https://WWW.EXAMPLE.COM./x", "example", "Example"],
+  ["https://t3.chat/", "t3", "T3"],
+];
+for (const [url, key, title] of cases) {
+  const s = siteFor(url);
+  eq(`siteFor ${url}`, s && [s.key, s.title], [key, title]);
+}
+
+// non-groupable schemes
+for (const url of ["chrome://extensions", "about:blank", "file:///c:/x.txt",
+                   "chrome-extension://abc/p.html", "not a url"]) {
+  eq(`reject ${url}`, siteFor(url), null);
+}
+
+// subdomain granularity
+const g = { granularity: "subdomain" };
+eq("sub docs.google.com", siteFor("https://docs.google.com/", g).title, "Docs \u00b7 Google");
+eq("sub www.google.com", siteFor("https://www.google.com/", g).title, "Google");
+eq("sub key is host", siteFor("https://docs.google.com/", g).key, "docs.google.com");
+
+// ---- title refinement
+eq("refine YouTube", refineTitle("Youtube", ["YouTube"]), "YouTube");
+eq("refine Stack Overflow", refineTitle("Stackoverflow", ["Stack Overflow"]), "Stack Overflow");
+eq("refine GitHub", refineTitle("Github", ["GitHub"]), "GitHub");
+eq("reject mismatched name", refineTitle("Google", ["Google Search"]), "Google");
+eq("reject overlong name", refineTitle("Example", ["Example ".repeat(9)]), "Example");
+eq("no candidates", refineTitle("Example", []), "Example");
+
+// ---- colour matching (same expectations validated offline)
+const colours = [
+  [[0xFF,0x00,0x00], "red"],    [[0xFF,0x45,0x00], "orange"],
+  [[0xFF,0x99,0x00], "orange"], [[0xFF,0xC7,0x2C], "yellow"],
+  [[0x1D,0xB9,0x54], "green"],  [[0x0A,0xBA,0xB5], "cyan"],
+  [[0x18,0x77,0xF2], "blue"],   [[0x91,0x46,0xFF], "purple"],
+  [[0xE1,0x30,0x6C], "pink"],   [[0x18,0x17,0x17], "grey"],
+  [[0x70,0x80,0x90], "grey"],   [[0xF5,0xF5,0xDC], "grey"],
+  [[0x0A,0x25,0x40], "blue"],   [[0x0B,0x3D,0x2E], "green"],
+  [[0x80,0x80,0x00], "yellow"], [[0x8B,0x45,0x13], "orange"],
+  [[0xD9,0x77,0x57], "orange"], [[0x63,0x2C,0xA6], "purple"],
+];
+for (const [rgb, want] of colours) eq(`colour ${rgbToHex(rgb)}`, nearestGroupColor(rgb), want);
+
+eq("rgbToHex rounds+clamps", rgbToHex([-3, 127.6, 300]), "#0080ff");
+eq("toLch grey has ~0 chroma", toLch([128,128,128]).C < 1, true);
+
+log.push("");
+log.push(fails === 0 ? `ALL PASS (${log.filter(l=>l.startsWith("ok")).length} checks)` : `${fails} FAILURES`);
+document.getElementById("out").textContent = log.join("\n");
+</script></body></html>

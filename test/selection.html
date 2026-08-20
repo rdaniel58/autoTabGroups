@@ -1,0 +1,104 @@
+<!doctype html>
+<html><body><pre id="out">running</pre>
+<script type="module">
+const out = document.getElementById("out");
+const log = [];
+let fails = 0;
+const flush = () => { out.textContent = log.join("\n"); };
+window.addEventListener("error", (e) => { log.push("WINDOW ERROR " + e.message); flush(); });
+
+// rankCandidates only accepts absolute URLs -- in the extension every candidate
+// already is one, so resolve the fixture paths here.
+const icon = (name, size, type = "image/png") =>
+  ({ url: new URL("fixtures/" + name, location.href).href, size, type });
+
+try {
+  const { bestColorFrom } = await import("../lib/icon.js");
+  const { nearestGroupColor, rgbToHex } = await import("../lib/palette.js");
+
+  // Each scenario is a candidate list of the shape resolveSiteIdentity builds.
+  const scenarios = [
+    {
+      // The reported bug. A web app manifest "purpose": "monochrome" icon is a
+      // white glyph on transparency; being the largest icon on offer it ranks
+      // first, decodes perfectly, and reports pure white. Accepting the first
+      // icon that merely decodes turned YouTube and Claude grey.
+      name: "big monochrome icon outranks branded one",
+      want: "red",
+      candidates: [
+        icon("mono-white-512.png", 512),
+        icon("red-bg-white-glyph.png", 144),
+        icon("all-white.png", 32),
+      ],
+    },
+    {
+      name: "genuinely monochrome site stays grey",
+      want: "grey",
+      candidates: [
+        icon("mono-white-512.png", 512),
+        icon("black-glyph-transparent.png", 64),
+      ],
+    },
+    {
+      name: "unfetchable icons are skipped",
+      want: "green",
+      candidates: [
+        icon("does-not-exist.png", 512),
+        icon("all-white.png", 256),
+        icon("green-glyph-transparent.png", 64),
+      ],
+    },
+    {
+      name: "first candidate wins when it has colour",
+      want: "green",
+      candidates: [
+        icon("green-glyph-transparent.png", 512),
+        icon("red-bg-white-glyph.png", 144),
+      ],
+    },
+    {
+      name: "largest branded icon preferred",
+      want: "purple",
+      candidates: [
+        icon("purple-solid.png", 256),
+        icon("cyan-over-pink.png", 64),
+      ],
+    },
+    {
+      name: "svg ranked last, raster still found",
+      want: "cyan",
+      candidates: [
+        icon("nope.svg", 1024, "image/svg+xml"),
+        icon("cyan-over-pink.png", 32),
+      ],
+    },
+    {
+      name: "relative urls rejected outright",
+      want: null,
+      candidates: [{ url: "fixtures/purple-solid.png", size: 64, type: "image/png" }],
+    },
+    {
+      name: "nothing usable at all",
+      want: null,
+      candidates: [
+        icon("does-not-exist.png", 64),
+        icon("empty-transparent.png", 64),
+      ],
+    },
+  ];
+
+  const lines = await Promise.all(scenarios.map(async (s) => {
+    const best = await bestColorFrom(s.candidates);
+    const got = best ? nearestGroupColor(best.rgb) : null;
+    const ok = got === s.want;
+    if (!ok) fails++;
+    const picked = best ? `${rgbToHex(best.rgb)} from ${best.iconUrl.split("/").pop()}` : "(none)";
+    return `${ok ? "ok  " : "FAIL"} ${s.name.padEnd(42)} -> ${String(got).padEnd(7)} ${picked}${ok ? "" : `  WANT ${s.want}`}`;
+  }));
+  log.push(...lines);
+  log.push("", fails === 0 ? "ALL PASS" : `${fails} FAILURES`);
+} catch (e) {
+  log.push(`TOP-LEVEL ${e.name}: ${e.message}`, e.stack || "");
+}
+flush();
+</script></body></html>

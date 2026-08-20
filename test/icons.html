@@ -1,0 +1,61 @@
+<!doctype html>
+<html><body><pre id="out">running</pre>
+<script type="module">
+const out = document.getElementById("out");
+const log = [];
+let fails = 0;
+const flush = () => { out.textContent = log.join("\n"); };
+window.addEventListener("error", (e) => { log.push("WINDOW ERROR " + e.message); flush(); });
+window.addEventListener("unhandledrejection", (e) => { log.push("REJECTION " + e.reason); flush(); });
+
+try {
+  log.push("importing modules"); flush();
+  const { dominantColorOf } = await import("../lib/icon.js");
+  const { nearestGroupColor, rgbToHex } = await import("../lib/palette.js");
+  log.push("modules loaded"); flush();
+
+  const cases = [
+    ["red-bg-white-glyph.png",       "red"],
+    ["green-glyph-transparent.png",  "green"],
+    ["black-glyph-transparent.png",  "grey"],
+    ["blue-on-white.png",            "blue"],
+    ["white-with-orange-accent.png", "orange"],
+    ["purple-solid.png",             "purple"],
+    ["all-white.png",                "grey"],
+    ["cyan-over-pink.png",           "cyan"],
+    ["green-antialiased.png",        "green"],
+  ];
+
+  const lines = await Promise.all(cases.map(async ([file, want]) => {
+    try {
+      const rgb = await dominantColorOf("fixtures/" + file);
+      const got = nearestGroupColor(rgb);
+      const ok = got === want;
+      if (!ok) fails++;
+      return `${ok ? "ok  " : "FAIL"} ${file.padEnd(30)} ${rgbToHex(rgb)} -> ${got}${ok ? "" : ` (want ${want})`}`;
+    } catch (e) {
+      fails++;
+      return `FAIL ${file} threw ${e.name}: ${e.message}`;
+    }
+  }));
+  log.push(...lines);
+
+  const rejects = await Promise.all(
+    [["empty-transparent.png", "fully transparent"], ["does-not-exist.png", "missing icon"]]
+      .map(async ([file, label]) => {
+        try {
+          await dominantColorOf("fixtures/" + file);
+          fails++;
+          return `FAIL ${label} should have thrown`;
+        } catch (e) {
+          return `ok   ${label} rejected: ${e.message}`;
+        }
+      }));
+  log.push(...rejects);
+
+  log.push("", fails === 0 ? "ALL PASS" : `${fails} FAILURES`);
+} catch (e) {
+  log.push(`TOP-LEVEL ${e.name}: ${e.message}`, e.stack || "");
+}
+flush();
+</script></body></html>

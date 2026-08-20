@@ -1,0 +1,18 @@
+# Build / packaging output
+*.zip
+*.crx
+*.pem
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python bytecode from test/make-fixtures.py
+__pycache__/
+*.pyc
