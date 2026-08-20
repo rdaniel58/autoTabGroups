@@ -1,20 +1,20 @@
 # Auto Tab Groups
 
 A Chrome/Brave extension that files every tab into a tab group named after the
-site in its URL, and colours that group with the site's own icon colour.
+site in its URL, and colors that group with the site's own icon color.
 
-`https://www.youtube.com/watch?v=…` → a group called **YouTube**, coloured red,
+`https://www.youtube.com/watch?v=…` → a group called **YouTube**, colored red,
 because that is what YouTube's favicon is.
 
 Two rules drive the whole design:
 
 - **Nothing is hardcoded.** There is no list of known sites anywhere in this
-  repository. Group names are parsed out of the URL; group colours are sampled
+  repository. Group names are parsed out of the URL; group colors are sampled
   from the icon the site itself serves. It works the same on a site nobody has
   ever heard of as it does on YouTube.
-- **There is no default colour.** If the icon cannot be read, the tab is left
+- **There is no default color.** If the icon cannot be read, the tab is left
   ungrouped and the site is listed under *Icon unreadable* in the popup. A
-  wrong colour is worse than no group, so the extension never guesses.
+  wrong color is worse than no group, so the extension never guesses.
 
 ## Install
 
@@ -44,14 +44,14 @@ own label:
 | `http://localhost:3000/` | Localhost | Localhost |
 | `http://192.168.1.10:8080/` | 192.168.1.10 | 192.168.1.10 |
 
-¹ Capitalisation corrected by the site itself — see below. Sites that declare
+¹ Capitalization corrected by the site itself — see below. Sites that declare
 no name for themselves keep the URL-derived spelling.
 
 Multi-label public suffixes (`co.uk`, `com.au`, `ne.jp`, …) are handled by a
 small table of *TLD grammar* in `lib/site.js`. That table lists generic
 second-level labels like `co` and `gov`; it never names an actual website.
 
-### Capitalisation
+### Capitalization
 
 A URL only ever gives you `youtube`, so plain title-casing would yield
 "Youtube". After the name is parsed, the extension checks what the site calls
@@ -64,40 +64,40 @@ it is the same word**:
 - `google` + `"Google Search"` → **Google** (rejected, not the same word)
 
 So the identity always comes from the URL; the site is only allowed to fix its
-own capitalisation and spacing.
+own capitalization and spacing.
 
-## How the colour is chosen
+## How the color is chosen
 
 1. **Collect the candidate icons.** The page is asked for every
    `<link rel="icon">`, `apple-touch-icon` and web app manifest icon it
    declares, plus `/apple-touch-icon.png` and `/favicon.ico` as a backstop for
    pages that declare nothing. They are ranked largest-first: a 180px app icon
-   carries far more colour information than the 16px favicon the tab strip
+   carries far more color information than the 16px favicon the tab strip
    shows.
 
-   Two kinds are dropped before ranking, because both are single-colour by
-   specification and can only ever report a colour the site does not use:
+   Two kinds are dropped before ranking, because both are single-color by
+   specification and can only ever report a color the site does not use:
    manifest icons marked `"purpose": "monochrome"`, and Safari's `mask-icon`.
 
-2. **Extract the dominant colour.** The icon is rasterised with
-   nearest-neighbour sampling (interpolation would invent colours the icon does
+2. **Extract the dominant color.** The icon is rasterized with
+   nearest-neighbor sampling (interpolation would invent colors the icon does
    not contain) and run through a weighted hue histogram. Pixels are weighted by
-   alpha, saturation and distance from centre; near-white and near-black are
+   alpha, saturation and distance from center; near-white and near-black are
    discounted 20× so that page-white padding and black outlines do not win. The
-   heaviest hue bucket and its two neighbours are averaged — merging the
-   neighbours keeps a colour that straddles a bucket boundary from being split.
+   heaviest hue bucket and its two neighbors are averaged — merging the
+   neighbors keeps a color that straddles a bucket boundary from being split.
 
    Icons that are genuinely monochrome fall through to their actual grey/black
    rather than having a hue invented for them.
 
-3. **Keep going until an icon actually has a colour.** Decoding an icon is not
+3. **Keep going until an icon actually has a color.** Decoding an icon is not
    the same as learning something from it — a white glyph on transparency
-   decodes perfectly and reports pure white. So a colourless reading does not
+   decodes perfectly and reports pure white. So a colorless reading does not
    end the search; the next candidate is tried, and a neutral result is only
    accepted once nothing chromatic turns up. That last part is what still sends
    genuinely monochrome brands to grey.
 
-4. **Snap to the nearest tab-group colour.** Chrome offers exactly nine: grey,
+4. **Snap to the nearest tab-group color.** Chrome offers exactly nine: grey,
    blue, red, yellow, green, pink, purple, cyan, orange.
 
 The matching in step 4 is hue-first in CIELAB. Straight ΔE distance is dominated
@@ -117,14 +117,17 @@ Two calibration notes, both in `lib/palette.js`:
   28°, where the name "red" stops reading as orange. The swatch Chrome paints is
   unchanged — only the decision boundary moves.
 
-These weights were fitted against 63 real brand colours plus CSS edge cases
+These weights were fitted against 63 real brand colors plus CSS edge cases
 (navy, olive, beige, slate, mint, salmon, brown, indigo). 62 of 63 land on the
-colour a person would pick; the lone holdout is Discord's blurple `#5865F2`,
+color a person would pick; the lone holdout is Discord's blurple `#5865F2`,
 which lands on blue rather than purple and is arguable either way.
 
-## Settings
+## The popup
 
-Open the popup from the toolbar icon.
+Open it from the toolbar icon. **Group all tabs** files everything open right
+now; **Re-sample icons** starts the colors over from scratch.
+
+### Settings
 
 | Setting | Default | What it does |
 | --- | --- | --- |
@@ -133,28 +136,42 @@ Open the popup from the toolbar icon.
 | **Minimum tabs per group** | 1 | Raise to 2 or 3 to stop one-off tabs from each getting their own group. Groups that fall below the minimum are dissolved automatically. |
 | **Leave tabs in groups I made by hand** | off | When on, a tab you dragged into your own group is left alone. |
 
-The popup also lists every site learned so far. Each row shows the group colour
-as a swatch with the raw sampled icon colour flagged in its corner, so you can
-see both what was read and what it snapped to. Hover for the hex value. Press
-**×** on a row to forget one site, or **Re-sample icons** to forget all of them
-and read every icon again — useful after a site rebrands.
+### Learned sites
+
+The popup lists every site learned so far. Each row shows the group color as a
+swatch with the raw sampled icon color flagged in its corner, so you can see
+both what was read and what it snapped to. Hover for the hex value.
+
+Each row has two buttons:
+
+- **Eyedropper** — pick the group color by hand. It opens the nine tab-group
+  colors with the current one ringed; choosing one applies it immediately and
+  the row is labeled *custom*. **Reset to icon** hands the site back to its
+  favicon. A hand-picked color always beats the sampled one.
+- **×** — forget the site entirely, dropping both what was learned and any
+  color you picked, so its icon is read fresh.
+
+**Re-sample icons** re-reads every icon from scratch and clears all hand-picked
+colors with it — it is the "start over from what the icons say" button. That is
+the only thing that discards an override: short of pressing it, one lasts
+indefinitely and survives closing the browser and upgrading the extension.
 
 Pinned tabs are never touched.
 
-## If a group is the wrong colour
+## If a group is the wrong color
 
-Colours are learned once per site and cached, so a bad reading sticks until you
-clear it. Press **×** on that site in the popup, or **Re-sample icons** to redo
-all of them.
+Colors are learned once per site and cached, so a bad reading sticks until you
+clear it. Set it yourself with the row's eyedropper, press **×** to re-read that
+one site, or **Re-sample icons** to redo all of them.
 
-The popup row shows both the raw hex that was sampled and the group colour it
+The popup row shows both the raw hex that was sampled and the group color it
 snapped to, which tells you which half is wrong: if the hex does not look like
 the site's brand, the wrong icon was picked; if the hex looks right but the
-group colour does not, the matching thresholds in `lib/palette.js` are at fault.
+group color does not, the matching thresholds in `lib/palette.js` are at fault.
 
-Upgrading the extension clears the cache automatically — `CACHE_VERSION` in
-`lib/store.js` is bumped whenever sampling changes, so you never have to know to
-re-sample after an update.
+Upgrading the extension discards the sampled cache on its own — `CACHE_VERSION`
+in `lib/store.js` is bumped whenever sampling changes, so you never have to know
+to re-sample after an update. Your own overrides are left alone.
 
 ## Layout
 
@@ -162,9 +179,9 @@ re-sample after an update.
 manifest.json        MV3 manifest
 background.js        service worker: events, grouping, the serial work queue
 lib/site.js          URL → group identity (no site list, TLD grammar only)
-lib/palette.js       CIELAB hue matching onto Chrome's nine group colours
-lib/icon.js          icon discovery + dominant-colour extraction
-lib/store.js         settings and the learned-colour cache
+lib/palette.js       CIELAB hue matching onto Chrome's nine group colors
+lib/icon.js          icon discovery + dominant-color extraction
+lib/store.js         settings, the learned-color cache, and color overrides
 popup/               toolbar UI
 test/                browser-run test pages
 ```
@@ -185,15 +202,19 @@ python -m http.server 8731
 Then open:
 
 - <http://127.0.0.1:8731/test/units.html> — URL parsing, title refinement and
-  colour matching (58 checks).
+  color matching (58 checks).
 - <http://127.0.0.1:8731/test/icons.html> — the full icon pipeline against
   synthetic favicons: brand-on-white, glyph-on-transparent, monochrome,
   antialiased edges, and the two failure cases that must stay ungrouped.
 - <http://127.0.0.1:8731/test/selection.html> — which icon gets picked out of a
   candidate list, including the regression for a large monochrome icon
   outranking the branded one.
+- <http://127.0.0.1:8731/test/popup-preview.html> — the real popup rendered
+  against a stubbed `chrome` API, so the UI can be worked on outside the
+  browser. Add `#test` to drive it and assert the color picker's behavior, or
+  `#open` for a screenshot with a picker expanded.
 
-Both print `ALL PASS` when green. Regenerate the fixtures with
+Each page prints `ALL PASS` when green. Regenerate the fixtures with
 `python test/make-fixtures.py` (standard library only).
 
 To run them headless:
@@ -208,7 +229,7 @@ chrome --headless=new --dump-dom --virtual-time-budget=30000 \
 | Permission | Why |
 | --- | --- |
 | `tabs`, `tabGroups` | Read tab URLs and create/update groups. |
-| `storage` | Remember learned colours so icons are not re-fetched constantly. |
+| `storage` | Remember learned colors so icons are not re-fetched constantly. |
 | `scripting` | Read `<link rel="icon">` and the site's own name from the page. |
 | `http://*/*`, `https://*/*` | Fetch icon files and web app manifests. |
 
@@ -216,6 +237,6 @@ Everything stays on your machine. Nothing is sent anywhere, and no analytics are
 collected. Icon fetches go to the sites you are already visiting, with
 `credentials: "omit"` so no cookies ride along.
 
-## Licence
+## License
 
 MIT — see [LICENSE](LICENSE).
