@@ -23,7 +23,7 @@ for (const mod of ["../lib/site.js", "../lib/palette.js", "../lib/icon.js",
 }
 
 const { siteFor, refineTitle } = await import("../lib/site.js");
-const { nearestGroupColor, rgbToHex, toLch } = await import("../lib/palette.js");
+const { nearestGroupColor, rgbToHex, toLch, PALETTES, groupSwatches, detectPalette } = await import("../lib/palette.js");
 
 // ---- URL -> group identity
 const cases = [
@@ -86,6 +86,37 @@ const colors = [
 for (const [rgb, want] of colors) eq(`color ${rgbToHex(rgb)}`, nearestGroupColor(rgb), want);
 
 eq("rgbToHex rounds+clamps", rgbToHex([-3, 127.6, 300]), "#0080ff");
+
+// ---- per-browser palettes
+// Every Chromium accepts the same nine NAMES; only the painted colors differ.
+const NAMES = ["grey","blue","red","yellow","green","pink","purple","cyan","orange"];
+for (const name of Object.keys(PALETTES)) {
+  eq(`${name} palette has the nine API names`, Object.keys(PALETTES[name]).sort(), [...NAMES].sort());
+}
+eq("running in chrome here", detectPalette(), "chrome");
+eq("groupSwatches defaults to the active palette", groupSwatches(), PALETTES.chrome);
+eq("unknown palette falls back to chrome", groupSwatches("netscape"), PALETTES.chrome);
+
+// Edge paints "red" as an orchid and "green" as a steel blue, so matching there
+// must pick the name that LOOKS right, not the one that is spelled right.
+const edge = [
+  [[0xFF,0x00,0x00], "orange"],  // YouTube red -> Edge orange (#d99067) is the warm one
+  [[0xE5,0x09,0x14], "orange"],
+  [[0x1D,0xB9,0x54], "cyan"],    // Spotify green -> Edge cyan (#5db3b6) is the green one
+  [[0x00,0x6B,0x41], "cyan"],
+  [[0x18,0x77,0xF2], "blue"],
+  [[0x91,0x46,0xFF], "purple"],
+  [[0xE1,0x30,0x6C], "pink"],
+  [[0xFF,0x99,0x00], "orange"],
+  [[0x18,0x17,0x17], "grey"],
+  [[0xF9,0xAB,0x00], "yellow"],
+];
+for (const [rgb, want] of edge) eq(`edge ${rgbToHex(rgb)}`, nearestGroupColor(rgb, "edge"), want);
+
+// The two palettes really do disagree -- if this ever passes trivially the
+// per-browser work has been undone.
+eq("chrome and edge disagree on pure red",
+  nearestGroupColor([255,0,0], "chrome") !== nearestGroupColor([255,0,0], "edge"), true);
 eq("toLch grey has ~0 chroma", toLch([128,128,128]).C < 1, true);
 
 log.push("");

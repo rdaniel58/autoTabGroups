@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Auto Tab Groups",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "Groups tabs by the site in their URL and colors each group from that site's own icon. Works in Chrome, Edge and Brave. No hardcoded site list, no invented colors.",
   "minimum_chrome_version": "116",
   "permissions": ["tabs", "tabGroups", "storage", "scripting"],

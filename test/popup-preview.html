@@ -19,10 +19,18 @@ const state = {
     claude: { title: "Claude", color: "orange", hex: "#d97757", host: "claude.ai" },
     microsoft: { title: "Microsoft", color: "green", hex: "#3c9d3c", host: "azure.microsoft.com" },
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     github: { title: "GitHub", color: "grey", hex: "#181717", host: "github.com" },
 =======
     github: { title: "GitHub", color: "grey", hex: "#181717", host: "github.com", source: "icon" },
     intranet: { title: "Intranet", color: "purple", hex: "#7b1fa2", host: "intranet.example", source: "header" },
+>>>>>>> Stashed changes
+=======
+    github: { title: "GitHub", color: "grey", hex: "#181717", host: "github.com", source: "icon" },
+    intranet: { title: "Intranet", color: "purple", hex: "#7b1fa2", host: "intranet.example", source: "header" },
+    extra1: { title: "Filler One", color: "blue", hex: "#1a73e8", host: "one.example", source: "icon" },
+    extra2: { title: "Filler Two", color: "red", hex: "#d93025", host: "two.example", source: "icon" },
+    extra3: { title: "Filler Three", color: "cyan", hex: "#007b83", host: "three.example", source: "icon" },
 >>>>>>> Stashed changes
   },
   overrides: { github: "purple" },
@@ -35,9 +43,12 @@ window.chrome = {
       if (msg.type === "getState") return structuredClone(state);
       if (msg.type === "setColor") {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
         if (msg.color) state.overrides[msg.key] = msg.color;
         else delete state.overrides[msg.key];
 =======
+=======
+>>>>>>> Stashed changes
         // Mirrors background.js: assigning a color to a site nothing could be
         // read from promotes it out of the unresolved list, and clearing that
         // color puts it back.
@@ -55,6 +66,9 @@ window.chrome = {
           state.unresolved[msg.key] = { title: existing.title, host: existing.host, attempts: 1 };
           delete state.sites[msg.key];
         }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
         return { ok: true };
       }
@@ -137,7 +151,10 @@ if (location.hash === "#test") {
   ok("reset disabled with no override", rowFor("Claude").querySelector(".auto").disabled);
 
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
   // --- a page-derived color is labeled as such rather than passed off as an icon
   ok("page-derived color labeled", detail("Intranet").includes("from header"));
 
@@ -147,6 +164,17 @@ if (location.hash === "#test") {
 
   ok("unresolved row has an eyedropper", Boolean(unresolvedRow()?.querySelector(".edit")));
   unresolvedRow().querySelector(".edit").click();
+<<<<<<< Updated upstream
+=======
+  // Not just wired up -- actually on screen. A picker that opens below the fold
+  // of a scrolled popup looks exactly like a button that does nothing.
+  {
+    const p = unresolvedRow().querySelector(".picker");
+    ok("unresolved picker is shown", !p.hidden && getComputedStyle(p).display !== "none");
+    const r = p.getBoundingClientRect();
+    ok("unresolved picker is scrolled into view", r.top < window.innerHeight && r.bottom > 0);
+  }
+>>>>>>> Stashed changes
   ok("unresolved picker has no color preselected",
     unresolvedRow().querySelectorAll(".swatch.selected").length === 0);
   ok("unresolved reset is disabled", unresolvedRow().querySelector(".auto").disabled);
@@ -165,6 +193,9 @@ if (location.hash === "#test") {
   rowFor("Weirdsite").querySelector(".auto").click();
   ok("clearing sends it back to unresolved", await waitFor(() => Boolean(unresolvedRow())));
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   const pre = document.createElement("pre");
   pre.id = "out";
