@@ -123,7 +123,9 @@ own capitalization and spacing.
    list, where you can assign a color yourself.
 
 5. **Snap to the nearest tab-group color.** Chromium offers exactly nine: grey,
-   blue, red, yellow, green, pink, purple, cyan, orange.
+   blue, red, yellow, green, pink, purple, cyan, orange. That list is a hard
+   limit -- `tabGroups.update()` rejects every other name, `gray` included, and
+   there is no custom-color option. Nine is all anyone gets.
 
 The matching in step 5 is hue-first in CIELAB. Straight ΔE distance is dominated
 by lightness, which is what drags dark brand purples onto "blue" and pale tints
@@ -221,7 +223,7 @@ to re-sample after an update. Your own overrides are left alone.
 manifest.json        MV3 manifest
 background.js        service worker: events, grouping, the serial work queue
 lib/site.js          URL → group identity (no site list, TLD grammar only)
-lib/palette.js       CIELAB hue matching onto Chrome's nine group colors
+lib/palette.js       per-browser palettes + CIELAB hue matching onto the nine names
 lib/icon.js          icon discovery, dominant-color extraction, page-color fallback
 lib/store.js         settings, the learned-color cache, and color overrides
 popup/               toolbar UI
@@ -244,7 +246,7 @@ python -m http.server 8731
 Then open:
 
 - <http://127.0.0.1:8731/test/units.html> — URL parsing, title refinement and
-  color matching (58 checks).
+  color matching for both the Chrome and Edge palettes (74 checks).
 - <http://127.0.0.1:8731/test/icons.html> — the full icon pipeline against
   synthetic favicons: brand-on-white, glyph-on-transparent, monochrome,
   antialiased edges, and the two failure cases that must stay ungrouped.

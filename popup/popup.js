@@ -73,6 +73,9 @@ function wirePicker(list, edit, picker) {
     }
     picker.hidden = !picker.hidden;
     edit.setAttribute("aria-expanded", String(!picker.hidden));
+    // Rows near the bottom of a scrolled popup expand off-screen, which reads
+    // as the button doing nothing at all. Bring the swatches into view.
+    if (!picker.hidden) picker.scrollIntoView({ block: "nearest" });
   });
 }
 
