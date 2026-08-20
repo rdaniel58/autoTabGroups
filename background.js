@@ -16,8 +16,8 @@ function enqueue(work) {
 
 /**
  * Learn a site the only way this extension is allowed to: read its icon.
- * Returns null when the colour cannot be determined yet -- the caller must then
- * leave the tab ungrouped rather than invent a colour.
+ * Returns null when the color cannot be determined yet -- the caller must then
+ * leave the tab ungrouped rather than invent a color.
  */
 async function learnSite(site, tab) {
   // Icons and <link> tags are not reliably present until the page has loaded.
@@ -58,7 +58,7 @@ async function placeTab(tab, record, settings, sites) {
     if (group) {
       if (group.title === record.title) {
         // Already home. The icon may have been re-sampled since, so keep the
-        // colour in sync.
+        // color in sync.
         if (group.color !== record.color) {
           await chrome.tabGroups.update(group.id, { color: record.color });
         }
@@ -111,11 +111,15 @@ async function handleTab(tabId) {
   let record = sites[site.key];
   if (!record) {
     record = await learnSite(site, tab);
-    // No icon colour means no group. There is deliberately no fallback colour;
+    // No icon color means no group. There is deliberately no fallback color;
     // the tab stays ungrouped and is retried on the next navigation or sweep.
     if (!record) return;
     sites = await store.getSites();
   }
+
+  // A color picked by hand always beats the one read from the icon.
+  const override = (await store.getOverrides())[site.key];
+  if (override) record = { ...record, color: override };
 
   await placeTab(tab, record, settings, sites);
 }
@@ -185,9 +189,23 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           settings: await store.getSettings(),
           sites: await store.getSites(),
           unresolved: await store.getUnresolved(),
+          overrides: await store.getOverrides(),
           swatches: GROUP_SWATCHES,
         });
         return;
+      case "setColor": {
+        // null hands the site back to its icon; anything else must be a real
+        // tab-group color, since Chrome rejects unknown names.
+        const color = message.color;
+        if (color !== null && !Object.hasOwn(GROUP_SWATCHES, color)) {
+          sendResponse({ error: `not a tab-group color: ${color}` });
+          return;
+        }
+        await store.setOverride(message.key, color);
+        await enqueue(sweep);
+        sendResponse({ ok: true });
+        return;
+      }
       case "setSettings":
         await store.setSettings(message.patch);
         await enqueue(sweep);

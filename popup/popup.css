@@ -108,15 +108,16 @@ section { margin-bottom: 14px; }
 
 .list { list-style: none; margin: 0; padding: 0; }
 
-.list li {
+.list li { border-bottom: 1px solid var(--line); }
+.list li:last-child { border-bottom: none; }
+
+.list .row {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 9px;
   padding: 6px 4px;
-  border-bottom: 1px solid var(--line);
 }
-.list li:last-child { border-bottom: none; }
 
 .chip {
   width: 15px;
@@ -125,7 +126,7 @@ section { margin-bottom: 14px; }
   border: 1px solid rgb(0 0 0 / .15);
   position: relative;
 }
-/* Sampled icon colour shown as a corner flag on the chosen group colour. */
+/* Sampled icon color shown as a corner flag on the chosen group color. */
 .chip::after {
   content: "";
   position: absolute;
@@ -148,17 +149,55 @@ section { margin-bottom: 14px; }
   white-space: nowrap;
 }
 
-.forget {
+.icon-btn {
   flex: none;
+  display: grid;
+  place-items: center;
   width: 22px;
+  height: 22px;
   padding: 0;
-  line-height: 20px;
+  line-height: 1;
   font-size: 14px;
   color: var(--muted);
   background: transparent;
   border-color: transparent;
 }
-.forget:hover { color: var(--fg); border-color: var(--line); }
+.icon-btn:hover { color: var(--fg); border-color: var(--line); }
+.icon-btn svg { width: 13px; height: 13px; display: block; }
+/* Eyedropper stays lit while a hand-picked color is in effect. */
+.edit.active { color: var(--accent); }
+
+.picker {
+  display: grid;
+  gap: 7px;
+  padding: 4px 4px 10px 28px;
+}
+/* An explicit display value beats the UA rule for [hidden], so restore it. */
+.picker[hidden] { display: none; }
+
+.swatches { display: flex; flex-wrap: wrap; gap: 5px; }
+
+.swatch {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 5px;
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / .2);
+  cursor: pointer;
+}
+.swatch:hover { border-color: var(--muted); }
+.swatch.selected { border-color: var(--fg); }
+
+.auto {
+  justify-self: start;
+  flex: none;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.auto:not(:disabled) { color: var(--fg); }
 
 .empty, .note { color: var(--muted); font-size: 11.5px; margin: 4px 0 0; }
 .note { margin-bottom: 6px; }

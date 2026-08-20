@@ -71,8 +71,8 @@ eq("reject mismatched name", refineTitle("Google", ["Google Search"]), "Google")
 eq("reject overlong name", refineTitle("Example", ["Example ".repeat(9)]), "Example");
 eq("no candidates", refineTitle("Example", []), "Example");
 
-// ---- colour matching (same expectations validated offline)
-const colours = [
+// ---- color matching (same expectations validated offline)
+const colors = [
   [[0xFF,0x00,0x00], "red"],    [[0xFF,0x45,0x00], "orange"],
   [[0xFF,0x99,0x00], "orange"], [[0xFF,0xC7,0x2C], "yellow"],
   [[0x1D,0xB9,0x54], "green"],  [[0x0A,0xBA,0xB5], "cyan"],
@@ -83,7 +83,7 @@ const colours = [
   [[0x80,0x80,0x00], "yellow"], [[0x8B,0x45,0x13], "orange"],
   [[0xD9,0x77,0x57], "orange"], [[0x63,0x2C,0xA6], "purple"],
 ];
-for (const [rgb, want] of colours) eq(`colour ${rgbToHex(rgb)}`, nearestGroupColor(rgb), want);
+for (const [rgb, want] of colors) eq(`color ${rgbToHex(rgb)}`, nearestGroupColor(rgb), want);
 
 eq("rgbToHex rounds+clamps", rgbToHex([-3, 127.6, 300]), "#0080ff");
 eq("toLch grey has ~0 chroma", toLch([128,128,128]).C < 1, true);

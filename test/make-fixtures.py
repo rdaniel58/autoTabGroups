@@ -52,7 +52,7 @@ make("green-glyph-transparent.png",
 make("black-glyph-transparent.png",
      lambda x, y: (0x18, 0x17, 0x17, 255) if in_circle(x, y, 26) else T)
 
-# 4. brand colour on a white page background (favicon with white padding)
+# 4. brand color on a white page background (favicon with white padding)
 make("blue-on-white.png",
      lambda x, y: (0x18, 0x77, 0xF2, 255) if 12 <= x < 52 and 12 <= y < 52
      else (255, 255, 255, 255))
@@ -67,7 +67,7 @@ make("purple-solid.png", lambda x, y: (0x63, 0x2C, 0xA6, 255))
 # 7. entirely white -- nothing to read, must land on grey not a hue
 make("all-white.png", lambda x, y: (255, 255, 255, 255))
 
-# 8. two brand colours, cyan covering more area than pink
+# 8. two brand colors, cyan covering more area than pink
 make("cyan-over-pink.png",
      lambda x, y: (0x0A, 0xBA, 0xB5, 255) if y < 44 else (0xD0, 0x18, 0x84, 255))
 
@@ -99,7 +99,7 @@ def make_large(name, fn, size):
 
 
 def _white_spokes(x, y):
-    # centre coordinates for the 512px canvas
+    # center coordinates for the 512px canvas
     c = (512 - 1) / 2
     dx, dy = x - c, y - c
     r = math.hypot(dx, dy)

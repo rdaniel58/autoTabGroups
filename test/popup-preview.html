@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="../popup/popup.css">
+</head>
+<body>
+<script>
+// Stand-in for the extension APIs so the real popup can render outside Chrome.
+const SWATCHES = {
+  grey: [0x5f, 0x63, 0x68], blue: [0x1a, 0x73, 0xe8], red: [0xd9, 0x30, 0x25],
+  yellow: [0xf9, 0xab, 0x00], green: [0x1e, 0x8e, 0x3e], pink: [0xd0, 0x18, 0x84],
+  purple: [0x93, 0x34, 0xe6], cyan: [0x00, 0x7b, 0x83], orange: [0xfa, 0x90, 0x3e],
+};
+const state = {
+  settings: { enabled: true, granularity: "subdomain", minTabs: 1, respectManualGroups: false },
+  sites: {
+    "azure.microsoft.com": { title: "Azure · Microsoft", color: "green", hex: "#3c9d3c", host: "azure.microsoft.com" },
+    claude: { title: "Claude", color: "orange", hex: "#d97757", host: "claude.ai" },
+    microsoft: { title: "Microsoft", color: "green", hex: "#3c9d3c", host: "azure.microsoft.com" },
+    github: { title: "GitHub", color: "grey", hex: "#181717", host: "github.com" },
+  },
+  overrides: { github: "purple" },
+  unresolved: { weirdsite: { title: "Weirdsite", host: "weirdsite.example", attempts: 3 } },
+  swatches: SWATCHES,
+};
+window.chrome = {
+  runtime: {
+    sendMessage: async (msg) => {
+      if (msg.type === "getState") return structuredClone(state);
+      if (msg.type === "setColor") {
+        if (msg.color) state.overrides[msg.key] = msg.color;
+        else delete state.overrides[msg.key];
+        return { ok: true };
+      }
+      if (msg.type === "forget") {
+        delete state.sites[msg.key]; delete state.overrides[msg.key];
+        return { ok: true };
+      }
+      return { ok: true };
+    },
+  },
+};
+</script>
+<script type="module">
+const html = await (await fetch("../popup/popup.html")).text();
+const parsed = new DOMParser().parseFromString(html, "text/html");
+// innerHTML does not run scripts, so popup.js is loaded once, below, by import.
+document.body.insertAdjacentHTML("afterbegin", parsed.body.innerHTML);
+await import("../popup/popup.js");
+
+// Open the first picker so the screenshot shows the control expanded.
+if (location.hash === "#open") {
+  await new Promise((r) => setTimeout(r, 100));
+  document.querySelector(".edit")?.click();
+}
+
+// #test drives the real popup DOM and asserts what the user would see.
+if (location.hash === "#test") {
+  const log = [];
+  let fails = 0;
+  const ok = (label, cond) => { if (!cond) fails++; log.push(`${cond ? "ok  " : "FAIL"} ${label}`); };
+
+  const rowFor = (title) => [...document.querySelectorAll("#sites li")]
+    .find((li) => li.querySelector("b")?.textContent === title);
+  const detail = (title) => rowFor(title)?.querySelector("small")?.textContent ?? "";
+  const waitFor = async (fn, ms = 2000) => {
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      if (fn()) return true;
+      await new Promise((r) => setTimeout(r, 20));
+    }
+    return false;
+  };
+
+  await waitFor(() => rowFor("Claude"));
+
+  ok("pickers start closed", [...document.querySelectorAll(".picker")].every((p) => p.hidden));
+
+  rowFor("Claude").querySelector(".edit").click();
+  ok("clicking the eyedropper opens that picker", !rowFor("Claude").querySelector(".picker").hidden);
+  ok("other pickers stay closed", rowFor("GitHub").querySelector(".picker").hidden);
+
+  rowFor("GitHub").querySelector(".edit").click();
+  ok("opening another closes the first", rowFor("Claude").querySelector(".picker").hidden);
+  rowFor("GitHub").querySelector(".edit").click();
+
+  ok("override marked selected", rowFor("GitHub")
+    .querySelector('.swatch[title="purple"]').classList.contains("selected"));
+  ok("sampled color marked selected when no override", rowFor("Claude")
+    .querySelector('.swatch[title="orange"]').classList.contains("selected"));
+
+  // Pick purple for Claude.
+  rowFor("Claude").querySelector(".edit").click();
+  rowFor("Claude").querySelector('.swatch[title="purple"]').click();
+  ok("picking a color updates the row",
+    await waitFor(() => detail("Claude").includes("purple · custom")));
+  ok("eyedropper lights up", rowFor("Claude").querySelector(".edit").classList.contains("active"));
+  ok("chip shows the chosen color",
+    rowFor("Claude").querySelector(".chip").style.background.includes("147, 52, 230"));
+
+  // Hand it back to the icon.
+  rowFor("Claude").querySelector(".edit").click();
+  const auto = rowFor("Claude").querySelector(".auto");
+  ok("reset button names the sampled color", auto.textContent.includes("orange"));
+  auto.click();
+  ok("reset restores the icon color",
+    await waitFor(() => detail("Claude") === "claude.ai · orange"));
+  ok("eyedropper unlights", !rowFor("Claude").querySelector(".edit").classList.contains("active"));
+
+  rowFor("Claude").querySelector(".edit").click();
+  ok("reset disabled with no override", rowFor("Claude").querySelector(".auto").disabled);
+
+  const pre = document.createElement("pre");
+  pre.id = "out";
+  pre.textContent = log.join("\n") + "\n\n" + (fails === 0 ? "ALL PASS" : `${fails} FAILURES`);
+  document.body.append(pre);
+}
+</script>
+</body>
+</html>
