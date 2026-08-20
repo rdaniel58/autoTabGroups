@@ -137,6 +137,10 @@ section { margin-bottom: 14px; }
   border: 1px solid var(--bg);
   background: var(--sampled);
 }
+/* Hand-picked colors have no sampled value to flag. */
+.chip.no-sample::after { display: none; }
+/* A site nothing could be read from yet. */
+.chip.empty { background: transparent; border-style: dashed; }
 
 .name { min-width: 0; }
 .name b { font-weight: 600; display: block; }
