@@ -1,7 +1,7 @@
 # Auto Tab Groups
 
-A Chrome/Brave extension that files every tab into a tab group named after the
-site in its URL, and colors that group with the site's own icon color.
+A browser extension that files every tab into a tab group named after the site
+in its URL, and colors that group with the site's own color.
 
 `https://www.youtube.com/watch?v=…` → a group called **YouTube**, colored red,
 because that is what YouTube's favicon is.
@@ -9,24 +9,34 @@ because that is what YouTube's favicon is.
 Two rules drive the whole design:
 
 - **Nothing is hardcoded.** There is no list of known sites anywhere in this
-  repository. Group names are parsed out of the URL; group colors are sampled
-  from the icon the site itself serves. It works the same on a site nobody has
-  ever heard of as it does on YouTube.
-- **There is no default color.** If the icon cannot be read, the tab is left
-  ungrouped and the site is listed under *Icon unreadable* in the popup. A
-  wrong color is worse than no group, so the extension never guesses.
+  repository. Group names are parsed out of the URL; group colors are read from
+  what the site itself serves. It works the same on a site nobody has ever heard
+  of as it does on YouTube.
+- **No color is ever invented.** Colors come from the site's icon, or failing
+  that from how the site colors its own header. If neither says anything, the
+  tab is left ungrouped and the site is listed under *No color found* in the
+  popup, where you can assign a color yourself. A wrong color is worse than no
+  group, so the extension never guesses.
 
 ## Install
 
-Not on the Web Store — load it unpacked:
+Works in Chrome, Edge and Brave — all Chromium, all the same build. Not on any
+store, so load it unpacked:
 
 1. Clone or download this repository.
-2. Open `chrome://extensions` (or `brave://extensions`).
-3. Turn on **Developer mode** (top right).
+2. Open `chrome://extensions`, `edge://extensions` or `brave://extensions`.
+3. Turn on **Developer mode** (top right in Chrome and Brave, left sidebar in Edge).
 4. Click **Load unpacked** and select this folder (the one with `manifest.json`).
 5. Click the extension's toolbar icon, then **Group all tabs**.
 
-New tabs are grouped as you browse. Requires Chrome/Brave 116 or newer.
+New tabs are grouped as you browse. Needs Chromium 116 or newer, which means
+Chrome/Brave 116+ or Edge 116+.
+
+Firefox is not supported. It has the `tabGroups` API from version 139 and uses
+the identical nine color names, but its MV3 background is an event page rather
+than a service worker, its promise-based namespace is `browser.*` rather than
+`chrome.*`, and host permissions there are opt-in — enough of a difference to
+need its own manifest and a compatibility shim.
 
 ## How the group name is derived
 
@@ -97,10 +107,25 @@ own capitalization and spacing.
    accepted once nothing chromatic turns up. That last part is what still sends
    genuinely monochrome brands to grey.
 
-4. **Snap to the nearest tab-group color.** Chrome offers exactly nine: grey,
+4. **Fall back to how the site colors itself.** Internal tools, dashboards and
+   login pages routinely ship no usable favicon while still having a clearly
+   branded header bar. When no icon yields a color, the page is asked for its
+   `<meta name="theme-color">` and then for the background of its masthead —
+   `header`, `[role="banner"]`, `.navbar`, `nav` and similar, matched
+   structurally, never by site name. An element only counts as a masthead if it
+   sits at the top of the page, spans it, and is a bar rather than a full-page
+   panel; a transparent one resolves to the first painted ancestor behind it.
+
+   The body background is pointedly *not* consulted. An unstyled page computes
+   to transparent and a styled white one to white, so using it would hand out
+   grey based on nothing more than whether the site bothered to set a
+   background. Those sites are better served by the popup's *No color found*
+   list, where you can assign a color yourself.
+
+5. **Snap to the nearest tab-group color.** Chromium offers exactly nine: grey,
    blue, red, yellow, green, pink, purple, cyan, orange.
 
-The matching in step 4 is hue-first in CIELAB. Straight ΔE distance is dominated
+The matching in step 5 is hue-first in CIELAB. Straight ΔE distance is dominated
 by lightness, which is what drags dark brand purples onto "blue" and pale tints
 onto "grey". Instead hue angle is the primary term and lightness breaks ties at
 0.30 weight — that pairing is what separates orange from yellow, whose hues are
@@ -121,6 +146,11 @@ These weights were fitted against 63 real brand colors plus CSS edge cases
 (navy, olive, beige, slate, mint, salmon, brown, indigo). 62 of 63 land on the
 color a person would pick; the lone holdout is Discord's blurple `#5865F2`,
 which lands on blue rather than purple and is arguable either way.
+
+The nine RGB values are the swatches Chrome paints. Edge paints slightly
+different shades for the same nine names, which changes nothing functionally —
+only a name is ever sent to the browser — but the calibration above was fitted
+against Chrome's numbers.
 
 ## The popup
 
@@ -151,6 +181,17 @@ Each row has two buttons:
 - **×** — forget the site entirely, dropping both what was learned and any
   color you picked, so its icon is read fresh.
 
+Rows say where their color came from: nothing extra when it came from the icon,
+`from theme-color` or `from header` when the icon had nothing to offer, and
+`custom` when you picked it.
+
+### No color found
+
+Sites whose icon *and* page both came up empty. They are deliberately left
+ungrouped rather than handed an invented color. Each row has an eyedropper:
+assign a color and the site moves up into **Learned sites** and is grouped from
+then on. Clearing that color sends it back down here to be retried.
+
 **Re-sample icons** re-reads every icon from scratch and clears all hand-picked
 colors with it — it is the "start over from what the icons say" button. That is
 the only thing that discards an override: short of pressing it, one lasts
@@ -164,10 +205,11 @@ Colors are learned once per site and cached, so a bad reading sticks until you
 clear it. Set it yourself with the row's eyedropper, press **×** to re-read that
 one site, or **Re-sample icons** to redo all of them.
 
-The popup row shows both the raw hex that was sampled and the group color it
+The popup row shows both the raw hex that was read and the group color it
 snapped to, which tells you which half is wrong: if the hex does not look like
 the site's brand, the wrong icon was picked; if the hex looks right but the
 group color does not, the matching thresholds in `lib/palette.js` are at fault.
+The `from …` label says which source supplied it.
 
 Upgrading the extension discards the sampled cache on its own — `CACHE_VERSION`
 in `lib/store.js` is bumped whenever sampling changes, so you never have to know
@@ -180,7 +222,7 @@ manifest.json        MV3 manifest
 background.js        service worker: events, grouping, the serial work queue
 lib/site.js          URL → group identity (no site list, TLD grammar only)
 lib/palette.js       CIELAB hue matching onto Chrome's nine group colors
-lib/icon.js          icon discovery + dominant-color extraction
+lib/icon.js          icon discovery, dominant-color extraction, page-color fallback
 lib/store.js         settings, the learned-color cache, and color overrides
 popup/               toolbar UI
 test/                browser-run test pages
@@ -209,6 +251,8 @@ Then open:
 - <http://127.0.0.1:8731/test/selection.html> — which icon gets picked out of a
   candidate list, including the regression for a large monochrome icon
   outranking the branded one.
+- <http://127.0.0.1:8731/test/page-color.html> — the header/theme-color
+  fallback, run against real iframes so layout and computed styles are genuine.
 - <http://127.0.0.1:8731/test/popup-preview.html> — the real popup rendered
   against a stubbed `chrome` API, so the UI can be worked on outside the
   browser. Add `#test` to drive it and assert the color picker's behavior, or

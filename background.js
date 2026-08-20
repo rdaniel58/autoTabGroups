@@ -35,7 +35,9 @@ async function learnSite(site, tab) {
     rgb: identity.rgb,
     hex: rgbToHex(identity.rgb),
     host: site.host,
-    iconUrl: identity.iconUrl,
+    iconUrl: identity.iconUrl ?? null,
+    // "icon", or where on the page the color came from instead.
+    source: identity.source ?? "icon",
     learnedAt: Date.now(),
   };
   await store.putSite(site.key, record);
@@ -196,12 +198,34 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       case "setColor": {
         // null hands the site back to its icon; anything else must be a real
         // tab-group color, since Chrome rejects unknown names.
-        const color = message.color;
+        const { key, color } = message;
         if (color !== null && !Object.hasOwn(GROUP_SWATCHES, color)) {
           sendResponse({ error: `not a tab-group color: ${color}` });
           return;
         }
-        await store.setOverride(message.key, color);
+        await store.setOverride(key, color);
+
+        const existing = (await store.getSites())[key];
+        if (color && !existing) {
+          // Assigning a color to a site whose color could never be read is the
+          // whole point of the picker, so give it the record it never got.
+          const pending = (await store.getUnresolved())[key];
+          await store.putSite(key, {
+            title: pending?.title ?? key,
+            color,
+            rgb: null,
+            hex: null,
+            host: pending?.host ?? "",
+            iconUrl: null,
+            source: "manual",
+            learnedAt: Date.now(),
+          });
+        } else if (!color && existing?.source === "manual") {
+          // Nothing was ever read for this site, so clearing the color returns
+          // it to the unreadable list rather than to a stale reading.
+          await store.forgetSite(key);
+        }
+
         await enqueue(sweep);
         sendResponse({ ok: true });
         return;

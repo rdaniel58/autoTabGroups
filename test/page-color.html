@@ -1,0 +1,128 @@
+<!doctype html>
+<html><body><pre id="out">running</pre>
+<script type="module">
+const out = document.getElementById("out");
+const log = [];
+let fails = 0;
+const flush = () => { out.textContent = log.join("\n"); };
+window.addEventListener("error", (e) => { log.push("WINDOW ERROR " + e.message); flush(); });
+
+const ok = (label, got, want) => {
+  const pass = JSON.stringify(got) === JSON.stringify(want);
+  if (!pass) fails++;
+  log.push(`${pass ? "ok  " : "FAIL"} ${label.padEnd(46)} ${JSON.stringify(got)}${pass ? "" : ` want ${JSON.stringify(want)}`}`);
+};
+
+/** Render markup in a real iframe so layout and computed styles are genuine. */
+function inFrame(markup) {
+  return new Promise((resolve) => {
+    const frame = document.createElement("iframe");
+    frame.style.cssText = "width:1024px;height:600px;border:0;position:absolute;left:-9999px";
+    frame.srcdoc = `<!doctype html><html><head><style>*{margin:0}</style></head><body>${markup}</body></html>`;
+    frame.addEventListener("load", () => resolve(frame));
+    document.body.append(frame);
+  });
+}
+
+try {
+  const { scrapeIdentity, pickPageColor } = await import("../lib/icon.js");
+  const { nearestGroupColor } = await import("../lib/palette.js");
+
+  const scrape = async (markup) => {
+    const frame = await inFrame(markup);
+    const result = scrapeIdentity(frame.contentDocument);
+    frame.remove();
+    return result;
+  };
+
+  // --- theme-color, in whatever CSS syntax the site wrote it in
+  for (const [value, want] of [
+    ['#0a66c2', [10, 102, 194]],
+    ['rgb(29, 185, 84)', [29, 185, 84]],
+    ['#e13', [238, 17, 51]],
+    ['rebeccapurple', [102, 51, 153]],
+    ['hsl(120 100% 25%)', [0, 128, 0]],
+  ]) {
+    const { pageColors } = await scrape(`<meta name="theme-color" content="${value}">`);
+    ok(`theme-color ${value}`, pageColors[0]?.rgb, want);
+  }
+
+  const bogus = await scrape('<meta name="theme-color" content="not-a-color">');
+  ok("invalid theme-color ignored", bogus.pageColors.some((c) => c.source === "theme-color"), false);
+
+  // --- header background, the case that matters for sites with no icon
+  const header = await scrape(
+    '<header style="height:64px;background:#7b1fa2">Site</header><main>body</main>');
+  ok("header background read", header.pageColors.find((c) => c.source === "header")?.rgb,
+    [123, 31, 162]);
+
+  const bannerRole = await scrape(
+    '<div role="banner" style="height:50px;background:rgb(0,120,212)"></div>');
+  ok("[role=banner] read", bannerRole.pageColors.find((c) => c.source === "header")?.rgb,
+    [0, 120, 212]);
+
+  // A transparent header should resolve to whatever is actually painted behind it.
+  const inherited = await scrape(
+    '<div style="background:#1e8e3e"><header style="height:60px">x</header></div>');
+  ok("transparent header walks up to painted ancestor",
+    inherited.pageColors.find((c) => c.source === "header")?.rgb, [30, 142, 62]);
+
+  // Sidebars and footers are not mastheads.
+  const sidebar = await scrape(
+    '<div style="height:400px"></div><nav style="height:60px;background:#d93025">low</nav>');
+  ok("element far down the page is not a header",
+    sidebar.pageColors.some((c) => c.source === "header"), false);
+
+  const narrow = await scrape('<header style="height:40px;width:80px;background:#d93025"></header>');
+  ok("narrow element is not a header", narrow.pageColors.some((c) => c.source === "header"), false);
+
+  const tall = await scrape('<header style="height:500px;background:#d93025"></header>');
+  ok("full-page panel is not a header", tall.pageColors.some((c) => c.source === "header"), false);
+
+  // --- a page that colors nothing deliberately yields nothing, so it can go to
+  // the popup's "no color found" list rather than being handed grey.
+  const plain = await scrape('<div style="height:10px"></div>');
+  ok("plain page yields no color", plain.pageColors, []);
+
+  const whiteBody = await scrape('<body style="background:#fff"><p>x</p>');
+  ok("body background is not a source", whiteBody.pageColors, []);
+
+  // --- ordering and neutral preference
+  const both = await scrape(
+    '<meta name="theme-color" content="#0a66c2"><header style="height:60px;background:#1e8e3e">x</header>');
+  ok("theme-color ranks above header", both.pageColors[0].source, "theme-color");
+  ok("header still reported", both.pageColors[1].source, "header");
+
+  ok("picks the first color with a hue", pickPageColor([
+    { source: "theme-color", rgb: [255, 255, 255] },
+    { source: "header", rgb: [217, 48, 37] },
+  ])?.source, "header");
+  ok("falls back to a neutral when nothing has a hue", pickPageColor([
+    { source: "theme-color", rgb: [255, 255, 255] },
+    { source: "page background", rgb: [250, 250, 250] },
+  ])?.source, "theme-color");
+  ok("nothing to pick", pickPageColor([]), null);
+  ok("undefined tolerated", pickPageColor(undefined), null);
+
+  // --- end to end: a site with a branded header gets that group color
+  const branded = await scrape(
+    '<header style="height:56px;background:#7b1fa2"></header><p>content</p>');
+  ok("purple header -> purple group",
+    nearestGroupColor(pickPageColor(branded.pageColors).rgb), "purple");
+
+  // --- icons are still scraped alongside
+  const withIcon = await scrape(
+    '<link rel="icon" href="/favicon-32x32.png" sizes="32x32">'
+    + '<meta property="og:site_name" content="Example">'
+    + '<header style="height:56px;background:#d93025"></header>');
+  ok("icon still found", withIcon.icons.length, 1);
+  ok("name still found", withIcon.names, ["Example"]);
+  ok("page color found too", withIcon.pageColors.find((c) => c.source === "header")?.rgb,
+    [217, 48, 37]);
+
+  log.push("", fails === 0 ? "ALL PASS" : `${fails} FAILURES`);
+} catch (e) {
+  log.push(`TOP-LEVEL ${e.name}: ${e.message}`, e.stack || "");
+}
+flush();
+</script></body></html>

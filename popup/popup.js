@@ -15,8 +15,14 @@ const EYEDROPPER_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColo
   <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3z"/>
 </svg>`;
 
-/** The nine colors, with a way back to whatever the icon said. */
-function buildPicker(key, site, override, swatches) {
+/**
+ * The nine colors, with a way back to whatever was read from the site.
+ * @param {string} key site key
+ * @param {{current: string|null, sampled: string|null}} state
+ *   `current` is the color ringed as selected; `sampled` is what the site
+ *   itself yielded, or null when nothing could ever be read from it.
+ */
+function buildPicker(key, { current, sampled }, swatches) {
   const picker = document.createElement("div");
   picker.className = "picker";
   picker.hidden = true;
@@ -36,19 +42,56 @@ function buildPicker(key, site, override, swatches) {
     swatch.style.background = hexOf(swatches, name);
     swatch.title = name;
     swatch.setAttribute("aria-label", name);
-    if ((override ?? site.color) === name) swatch.classList.add("selected");
+    if (current === name) swatch.classList.add("selected");
     swatch.addEventListener("click", () => choose(name));
     swatchRow.append(swatch);
   }
 
   const auto = document.createElement("button");
   auto.className = "auto";
-  auto.textContent = override ? `Reset to icon (${site.color})` : "Using icon color";
-  auto.disabled = !override;
+  const isCustom = current !== null && current !== sampled;
+  if (sampled) {
+    auto.textContent = isCustom ? `Reset to ${sampled} from the site` : "Using the site's own color";
+  } else {
+    auto.textContent = isCustom ? "Clear and retry the site" : "Nothing could be read yet";
+  }
+  auto.disabled = !isCustom;
   auto.addEventListener("click", () => choose(null));
 
   picker.append(swatchRow, auto);
   return picker;
+}
+
+/** Wires an eyedropper button to a picker, keeping only one open at a time. */
+function wirePicker(list, edit, picker) {
+  edit.addEventListener("click", () => {
+    for (const other of list.querySelectorAll(".picker")) {
+      if (other !== picker) other.hidden = true;
+    }
+    for (const other of list.querySelectorAll(".edit")) {
+      if (other !== edit) other.setAttribute("aria-expanded", "false");
+    }
+    picker.hidden = !picker.hidden;
+    edit.setAttribute("aria-expanded", String(!picker.hidden));
+  });
+}
+
+function eyedropperButton(label, lit) {
+  const edit = document.createElement("button");
+  edit.className = "icon-btn edit";
+  edit.innerHTML = EYEDROPPER_SVG;
+  edit.title = "Choose this group's color";
+  edit.setAttribute("aria-label", label);
+  edit.setAttribute("aria-expanded", "false");
+  if (lit) edit.classList.add("active");
+  return edit;
+}
+
+/** " · custom", " · from header", or nothing when the icon supplied it. */
+function originLabel(site, override) {
+  if (override || site.source === "manual") return " · custom";
+  if (!site.source || site.source === "icon") return "";
+  return ` · from ${site.source}`;
 }
 
 function renderSites(sites, overrides, swatches) {
@@ -72,26 +115,25 @@ function renderSites(sites, overrides, swatches) {
     const chip = document.createElement("span");
     chip.className = "chip";
     chip.style.background = hexOf(swatches, effective);
-    chip.style.setProperty("--sampled", site.hex);
-    chip.title = override
-      ? `set by hand to ${override} (icon was ${site.hex} → ${site.color})`
-      : `icon ${site.hex} → ${site.color}`;
+    // The corner flag shows the raw color that was read; a hand-picked color
+    // for a site nothing could be read from has none to show.
+    if (site.hex) chip.style.setProperty("--sampled", site.hex);
+    else chip.classList.add("no-sample");
+    chip.title = site.hex
+      ? (override
+        ? `set by hand to ${override} (${site.source ?? "icon"} was ${site.hex} → ${site.color})`
+        : `${site.source ?? "icon"} ${site.hex} → ${site.color}`)
+      : `set by hand to ${effective}`;
 
     const name = document.createElement("span");
     name.className = "name";
     const title = document.createElement("b");
     title.textContent = site.title;
     const detail = document.createElement("small");
-    detail.textContent = `${site.host} · ${effective}${override ? " · custom" : ""}`;
+    detail.textContent = `${site.host} · ${effective}${originLabel(site, override)}`;
     name.append(title, detail);
 
-    const edit = document.createElement("button");
-    edit.className = "icon-btn edit";
-    edit.innerHTML = EYEDROPPER_SVG;
-    edit.title = "Choose this group's color";
-    edit.setAttribute("aria-label", `Choose color for ${site.title}`);
-    edit.setAttribute("aria-expanded", "false");
-    if (override) edit.classList.add("active");
+    const edit = eyedropperButton(`Choose color for ${site.title}`, Boolean(override));
 
     const forget = document.createElement("button");
     forget.className = "icon-btn forget";
@@ -103,18 +145,11 @@ function renderSites(sites, overrides, swatches) {
       await refresh();
     });
 
-    const picker = buildPicker(key, site, override, swatches);
-    edit.addEventListener("click", () => {
-      // Only one picker open at a time, or the list turns into a wall.
-      for (const other of list.querySelectorAll(".picker")) {
-        if (other !== picker) other.hidden = true;
-      }
-      for (const other of list.querySelectorAll(".edit")) {
-        if (other !== edit) other.setAttribute("aria-expanded", "false");
-      }
-      picker.hidden = !picker.hidden;
-      edit.setAttribute("aria-expanded", String(!picker.hidden));
-    });
+    const picker = buildPicker(key, {
+      current: effective,
+      sampled: site.hex ? site.color : null,
+    }, swatches);
+    wirePicker(list, edit, picker);
 
     row.append(chip, name, edit, forget);
     li.append(row, picker);
@@ -122,20 +157,18 @@ function renderSites(sites, overrides, swatches) {
   }
 }
 
-function renderUnresolved(unresolved) {
+function renderUnresolved(unresolved, swatches) {
   const entries = Object.entries(unresolved);
   $("unresolvedSection").hidden = entries.length === 0;
   $("unresolvedCount").textContent = entries.length ? `(${entries.length})` : "";
 
   const list = $("unresolved");
   list.textContent = "";
-  for (const [, item] of entries) {
+  for (const [key, item] of entries) {
     const li = document.createElement("li");
+
     const chip = document.createElement("span");
-    chip.className = "chip";
-    chip.style.background = "transparent";
-    chip.style.setProperty("--sampled", "transparent");
-    chip.style.borderStyle = "dashed";
+    chip.className = "chip no-sample empty";
 
     const name = document.createElement("span");
     name.className = "name";
@@ -145,10 +178,16 @@ function renderUnresolved(unresolved) {
     detail.textContent = `${item.host} · ${item.attempts} attempt${item.attempts === 1 ? "" : "s"}`;
     name.append(title, detail);
 
+    // No color could be read here, so the picker is the only way to give this
+    // site a group. Assigning one moves it up into Learned sites.
+    const edit = eyedropperButton(`Assign a color to ${item.title}`, false);
+    const picker = buildPicker(key, { current: null, sampled: null }, swatches);
+    wirePicker(list, edit, picker);
+
     const row = document.createElement("div");
     row.className = "row";
-    row.append(chip, name, document.createElement("span"));
-    li.append(row);
+    row.append(chip, name, edit, document.createElement("span"));
+    li.append(row, picker);
     list.append(li);
   }
 }
@@ -165,7 +204,7 @@ async function refresh() {
   if (!state) return;
   renderSettings(state.settings);
   renderSites(state.sites, state.overrides ?? {}, state.swatches);
-  renderUnresolved(state.unresolved);
+  renderUnresolved(state.unresolved, state.swatches);
 
   const custom = Object.keys(state.overrides ?? {}).length;
   $("resample").title = custom
