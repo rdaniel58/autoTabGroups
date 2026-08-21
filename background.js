@@ -192,23 +192,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           sites: await store.getSites(),
           unresolved: await store.getUnresolved(),
           overrides: await store.getOverrides(),
-<<<<<<< Updated upstream
-          swatches: GROUP_SWATCHES,
-=======
           swatches: groupSwatches(),
           palette: ACTIVE_PALETTE,
->>>>>>> Stashed changes
         });
         return;
       case "setColor": {
         // null hands the site back to its icon; anything else must be a real
         // tab-group color, since Chrome rejects unknown names.
         const { key, color } = message;
-<<<<<<< Updated upstream
-        if (color !== null && !Object.hasOwn(GROUP_SWATCHES, color)) {
-=======
         if (color !== null && !Object.hasOwn(groupSwatches(), color)) {
->>>>>>> Stashed changes
           sendResponse({ error: `not a tab-group color: ${color}` });
           return;
         }
